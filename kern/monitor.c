@@ -24,6 +24,7 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+	{ "backtrace", "Display a listing of function call frames", mon_backtrace }
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -57,7 +58,31 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
+	cprintf("Stack backtrack:\n");
 	// Your code here.
+	uint32_t ebp = read_ebp();
+	uint32_t eip = 0;
+	struct Eipdebuginfo info;
+	#define TO_INT(x) *((uint32_t*)(x))
+	// ebp f0109e58  eip f0100a62  args 00000001 f0109e80 f0109e98 f0100ed2 00000031
+	while (ebp) { // print all stack
+	eip = TO_INT(ebp + 4);
+	cprintf("ebp %08x  eip %08x  args %08x %08x %08x %08x %08x\n",
+			ebp,
+			eip,
+			TO_INT((ebp+8)),
+			TO_INT((ebp+12)),
+			TO_INT((ebp+16)),
+			TO_INT((ebp+20)),
+			TO_INT((ebp+24)));
+	
+	if (!debuginfo_eip(eip, &info)) {
+		cprintf("%s:%d %.*s+%d\n",info.eip_file, info.eip_line, info.eip_fn_namelen, info.eip_fn_name, eip-info.eip_fn_addr);
+	} else {
+		cprintf("Error happend when reading symbol table\n");
+	}
+	ebp = TO_INT(ebp);
+	}
 	return 0;
 }
 
@@ -112,7 +137,7 @@ monitor(struct Trapframe *tf)
 {
 	char *buf;
 
-	cprintf("Welcome to the JOS kernel monitor!\n");
+	cprintf("\033[31mWelcome \033[32mto \033[33mthe \033[34mJOS \033[35mkernel \033[36mmonitor!\033[0m\n");
 	cprintf("Type 'help' for a list of commands.\n");
 
 
